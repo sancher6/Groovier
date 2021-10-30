@@ -23,3 +23,5 @@ typings/
 # config
 config.json
 application.yml
+
+__pycache__/

@@ -33,7 +33,7 @@ async def on_message(message):
 
 
 @bot.command(help="Sends Pong with Bot Latency like this: !ping") 
-async def ping(ctx): 
+async def ping(ctx):
     await ctx.channel.send(f'PONG {bot.latency ** 1000}ms')
 
 
@@ -50,30 +50,47 @@ async def leave(ctx):
         await voice.disconnect()
 
 
-@bot.command(name="test", help="Test Sample MP3 like this: -test_mp3") 
-async def test_mp3(ctx, *args): 
+@bot.command(name="test", help="Test Sample MP3 like this: !test")
+async def test_mp3(ctx, *args):
     file_name = Path(args[0] + ".mp3")
+    #create concat_filename method
     sounds_dir = Path("../test/sounds")
     test_file = sounds_dir / file_name
     if not Path(test_file).exists(): 
         print("File Path Does not Exist")
         return
-    connected = ctx.author.voice
-    if connected: 
-        voice = await connected.channel.connect() 
-        print(f"We have succesfully joined: {connected.channel}")
-        voice.play(discord.FFmpegPCMAudio(test_file))
-        # await voice.disconnect() 
-    else: 
+    author_connected = ctx.author.voice
+    voice = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+
+    if author_connected:
+        if voice.is_connected():
+            if author_connected.channel == voice.channel:
+                voice.play(discord.FFmpegPCMAudio(test_file))
+            else:
+                #if it was in a channel, but not the same as author
+                voice = await author_connected.channel.connect()
+                print(f"We have succesfully joined: {author_connected.channel}")
+                voice.play(discord.FFmpegPCMAudio(test_file))
+
+        else:
+            #this is when bot is not connected
+            voice = await author_connected.channel.connect()
+            print(f"We have succesfully joined: {author_connected.channel}")
+            voice.play(discord.FFmpegPCMAudio(test_file))
+    else:
         await ctx.send("Please join a voice chat prior to using this command")
 
+    
 
-@bot.command(name="url", help="Test Sample URL    to mp3 like this: -url")
-async def test_url(ctx, *args): 
+    # remember this part await voice.disconnect()
+
+@bot.command(name="url", help="Test Sample URL to mp3 like this: !url")
+async def test_url(ctx, *args):
     search = concat_args(args)
     search = urllib.parse.quote(search)
     print(f"Search: {search}")
     html = urllib.request.urlopen(f"https://www.youtube.com/results?search_query={search}")
+    print(f"the fucker is this: {html}")
     video_ids = re.findall(r"watch\?v=(\S{11})", html.read().decode())
     video_url = "https://www.youtube.com/watch?v=" + video_ids[0]
     ydl_opts = {
