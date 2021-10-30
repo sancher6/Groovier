@@ -1,5 +1,3 @@
-
-
 def concat_args(args): 
     response = ""
     for i, arg in enumerate(args): 
