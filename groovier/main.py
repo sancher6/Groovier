@@ -16,8 +16,7 @@ from itertools import cycle
 import youtube_dl
 
 load_dotenv()
-# TOKEN = os.getenv("DISCORD_TOKEN")
-TOKEN = "OTA1OTE5MTcxNzEwMzIwNzUx.YYRE-Q.iBHVWoFlqegfz1kmPg88fgdU9M0" # this is Doug's token
+TOKEN = os.getenv("DISCORD_TOKEN")
 THUMBS_UP = "\N{THUMBS UP SIGN}"
 THUMBS_DOWN = "\N{THUMBS DOWN SIGN}"
 FFMPEG_OPTIONS = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5','options': '-vn'}
@@ -59,6 +58,7 @@ async def leave(ctx):
     voice = discord.utils.get(bot.voice_clients, guild=ctx.guild)
     if voice is not None:
         await voice.disconnect()
+
 
 async def wait_queue(ctx):
     voice = discord.utils.get(bot.voice_clients, guild=ctx.guild)
