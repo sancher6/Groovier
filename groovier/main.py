@@ -5,11 +5,8 @@ from discord.ext.commands.converter import _get_from_guilds
 from dotenv import load_dotenv
 from discord.ext import commands
 from pathlib import Path
-from utils import get_song_title
-from utils import concat_args
-import urllib.request
+from utils import get_videoid, concat_args, get_song_title
 import urllib.parse
-import re
 import pafy
 import asyncio
 from itertools import cycle
@@ -17,19 +14,57 @@ import youtube_dl
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
+TOKEN = "OTA1OTE5MTcxNzEwMzIwNzUx.YYRE-Q.iBHVWoFlqegfz1kmPg88fgdU9M0"
 THUMBS_UP = "\N{THUMBS UP SIGN}"
 THUMBS_DOWN = "\N{THUMBS DOWN SIGN}"
 FFMPEG_OPTIONS = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5','options': '-vn'}
 bot = commands.Bot(command_prefix="-")
 logging.basicConfig(format="%(asctime)s - %(message)s", level=logging.INFO)
-song_queue=[]
-current_song_title=""
+song_queue=[] # holds pairs of video url followed by song title, as [url0, song_title0, url1, etc]
+
+# async def update_queue(ctx):
+#     voice = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+#     await ctx.channel.send(f"Song queue is: {song_queue}")
+#     while len(song_queue) > 0:
+#         if not voice.is_playing():
+#             play_song(ctx, song_queue[0])
+#             del song_queue[0]
+#             del song_queue[0]
+#         await asyncio.sleep(1)
+async def update_queue(ctx):
+    voice = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+    await ctx.channel.send(f"Song queue is: {song_queue}")
+    while len(song_queue) > 0:
+        if not voice.is_playing():
+            await play_song(ctx, song_queue[0])
+            del song_queue[0]
+            del song_queue[0]
+        await asyncio.sleep(1)
+
+
+async def play_song(ctx, video_url):
+    voice = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+    song = pafy.new(video_url)
+
+    audio = song.getbestaudio()
+
+    source = discord.FFmpegPCMAudio(audio.url, **FFMPEG_OPTIONS)
+    if not voice.is_playing():
+        voice.play(source)
+        await ctx.send(f"Now playing {song_queue[1]}")
+    else:
+        asyncio.sleep(1)
+        # asyncio.run_coroutine_threadsafe(update_queue(ctx), bot.loop)
 
 
 @bot.event
 async def on_ready():
     logging.info(f"{bot.user} has connected to Discord!")
     await bot.change_presence(activity=discord.Game(THUMBS_DOWN))
+
+    voice = discord.utils.get(bot.voice_clients)
+    if voice is not None:
+        await voice.disconnect()
 
 
 @bot.event
@@ -48,10 +83,30 @@ async def ping(ctx):
 
 @bot.command(help="`-join` connects bot to current voice channel")
 async def join(ctx):
+    # author_channel = ctx.author.voice
+    # if author_channel is not None:
+    #     await author_channel.channel.connect()
     author_channel = ctx.author.voice
-    if author_channel is not None:
-        await author_channel.channel.connect()
+    voice = discord.utils.get(bot.voice_clients, guild=ctx.guild)
 
+    if author_channel is None:
+        await ctx.send("Join a voice channel to use bot commands")
+        return
+    
+    if voice is None:
+        await author_channel.channel.connect()
+        logging.info(f"We have succesfully joined: {author_channel.channel}")
+        return
+
+    if author_channel.channel is voice.channel:
+        await ctx.send("Already connected to this voice channel")
+        return
+
+    if author_channel.channel is not voice.channel:
+        await leave(ctx)
+        await author_channel.channel.connect()
+        logging.info(f"We have succesfully joined: {author_channel.channel}")
+    
 
 @bot.command(help="`-leave` disconnects bot from current voice channel")
 async def leave(ctx):
@@ -60,65 +115,44 @@ async def leave(ctx):
         await voice.disconnect()
 
 
-async def wait_queue(ctx):
-    voice = discord.utils.get(bot.voice_clients, guild=ctx.guild)
-    while len(song_queue) > 0:
-        if not voice.is_playing():
-            await ctx.send(f"Now playing {current_song_title}")
-            voice.play(song_queue[0])
-            del song_queue[0]
-        await asyncio.sleep(1)
+# @bot.command(name="add", aliases=['a'], help="`-a *song name*` adds the specified song to the top of queue")
+# async def add_song(ctx, *args):
 
 
 @bot.command(name="play", aliases=['p'], help="`-p *song name*` plays the specified song")
-async def play_song(ctx, *args):
+async def add_song(ctx, *args):
     if ctx.message.author.voice == None:
         await ctx.send("No Voice Channel", "You need to be in a voice channel to use this command")
         return
 
-    author_connected = ctx.author.voice
-    voice = discord.utils.get(bot.voice_clients, guild=ctx.guild)
-    if author_connected:
+    join(ctx)
 
-        if (voice is None) or (voice.channel is not author_connected.channel):
+    if len(args) > 0:
 
-            voice = await author_connected.channel.connect()
-            logging.info(f"We have succesfully joined: {author_connected.channel}")
+        search_phrase = concat_args(args)
 
-        if len(args) > 0: 
-            search = concat_args(args)
-            search = urllib.parse.quote(search)
+        video_id = get_videoid(search_phrase)
 
-            html = urllib.request.urlopen(
-                f"https://www.youtube.com/results?search_query={search}"
-            )
-            video_ids = re.findall(r"watch\?v=(\S{11})", html.read().decode())
-            if len(video_ids) == 0: 
-                await ctx.send("No results found...")
-                return
-            song_url = f"https://www.youtube.com/watch?v={video_ids[0]}"
+        if video_id == "":
+            await ctx.send(f"No results found for \"{search_phrase}\"")
+            return
 
-            current_song_title=get_song_title(video_ids[0])
-            logging.info(f"Song Url: {song_url}\nSong Title: {current_song_title}")
+        video_url=f"https://www.youtube.com/watch?v={video_id}"
+        song_queue.append(video_url)
+        song_queue.append(get_song_title(video_id))
+        logging.info(f"New song's video url: {song_queue[0]}\nVideo Title: {song_queue[1]}")
 
-            song = pafy.new(video_ids[0])
+        ## the stuff below this point is what actually plays the audio, what's above it gets the info and queues the song
 
-            audio = song.getbestaudio()
-
-            source = discord.FFmpegPCMAudio(audio.url, **FFMPEG_OPTIONS)
-            if not voice.is_playing(): 
-                voice.play(source)
-                await ctx.send(f"Now playing {current_song_title}")
-            else:
-                song_queue.append(source)
-                await ctx.send(f"{current_song_title} has been added to queue")
-                asyncio.run_coroutine_threadsafe(wait_queue(ctx), bot.loop)
+        # this is the part I'm talking about
+        # await update_queue(ctx)
+        asyncio.run_coroutine_threadsafe(update_queue(ctx), bot.loop)
 
 
 @bot.command(name="stop", aliases=['s'], help="`-s` stops playing current song")
 async def stop_playing(ctx, *args):
     voice_client = ctx.message.guild.voice_client
-    if voice_client.is_playing(): 
+    if voice_client.is_playing():
         await voice_client.stop()
     else:
         await ctx.send("The bot is not playing anything at the moment.")
@@ -129,14 +163,14 @@ async def next_song(ctx):
     voice_client = discord.utils.get(ctx.bot.voice_clients, guild=ctx.guild)
     voice_client.pause()
     del song_queue[0]
-    if len(song_queue) > 0: 
+    if len(song_queue) > 0:
         song = pafy.new(song_queue[0])
 
         audio = song.getbestaudio()
 
         source = discord.FFmpegPCMAudio(audio.url, **FFMPEG_OPTIONS)
         voice_client.play(source)
-        del song_queue[0]  
+        del song_queue[0]
 
 
 @bot.command(name='pause', help='`-pause` pauses the current song')
@@ -154,6 +188,7 @@ async def resume(ctx):
     if voice_client.is_paused():
         voice_client.resume()
     else:
-        await ctx.send("The bot was not playing anything before this. Use play command")
+        await ctx.send("The bot was not paused.")
+
 
 bot.run(TOKEN)

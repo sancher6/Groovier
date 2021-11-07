@@ -1,4 +1,6 @@
 import urllib.request
+import urllib.parse
+import re
 import json
 
 def concat_args(args): 
@@ -9,6 +11,19 @@ def concat_args(args):
         else: 
             response = arg
     return response
+
+def get_videoid(args):
+    search = urllib.parse.quote(args)
+
+    html = urllib.request.urlopen(
+        f"https://www.youtube.com/results?search_query={search}"
+    )
+    video_ids = re.findall(r"watch\?v=(\S{11})", html.read().decode())
+
+    if len(video_ids) == 0: 
+        return ""
+    else:
+        return video_ids[0]
 
 def get_song_title(video_id):
     params = {"format": "json", "url": "https://www.youtube.com/watch?v=%s" % video_id}
