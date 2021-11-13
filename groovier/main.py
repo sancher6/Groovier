@@ -12,6 +12,7 @@ import pafy
 import asyncio
 from itertools import cycle
 import youtube_dl
+import json
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -60,10 +61,20 @@ async def wait_queue(ctx):
     voice = discord.utils.get(bot.voice_clients, guild=ctx.guild)
     while len(song_queue) > 0: 
         if not voice.is_playing(): 
-            await ctx.send("Now Playing...")
+            # await ctx.send("Now Playing...")
             voice.play(song_queue[0])
             del song_queue[0]
         await asyncio.sleep(1)
+
+
+@bot.command(name="queue", aliases=['q'], help="View Queue like this: -q")
+async def view_queue(ctx, *args):
+    if len(song_queue) > 0: 
+        song_list = "```"
+        for song in song_queue: 
+            song_list += str(song)
+        song_list += "```"
+        await ctx.send(song_list)
 
 
 @bot.command(name="play", aliases=['p'], help="Play song like this: !p")
@@ -93,6 +104,14 @@ async def play_song(ctx, *args):
                 return
             song_url = f"https://www.youtube.com/watch?v={video_ids[0]}"
             logging.info(f"Song Url: {song_url}")
+            params = {"format": "json", "url": song_url}
+            url = "https://www.youtube.com/oembed"
+            query_string = urllib.parse.urlencode(params)
+            url = url + "?" + query_string
+            with urllib.request.urlopen(url) as response:
+                response_text = response.read()
+                data = json.loads(response_text.decode())
+                song_title = data['title']
 
             song = pafy.new(video_ids[0])
 
@@ -100,11 +119,11 @@ async def play_song(ctx, *args):
 
             source = discord.FFmpegPCMAudio(audio.url, **FFMPEG_OPTIONS)
             if not voice.is_playing(): 
-                await ctx.send("Now Playing...")
+                await ctx.send(f"Now Playing {song_title}")
                 voice.play(source)
             else: 
                 song_queue.append(source)
-                await ctx.send("Song Queued")
+                await ctx.send(f"Song Queued {song_title}")
                 asyncio.run_coroutine_threadsafe(wait_queue(ctx), bot.loop)
 
 
