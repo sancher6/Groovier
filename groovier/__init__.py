@@ -1,2 +1,1 @@
-from .main import bot
-from .utils import concat_args
+__version__="0.0.0"
