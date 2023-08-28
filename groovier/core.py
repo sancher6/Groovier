@@ -1,3 +1,4 @@
+from math import ceil, floor
 import os
 import logging
 import discord
@@ -14,14 +15,16 @@ import urllib.parse
 import re
 import pafy
 import asyncio
-import json
+import random
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 THUMBS_UP = "\N{THUMBS UP SIGN}"
 FFMPEG_OPTIONS = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5','options': '-vn'}
-client = discord.Client()
-bot = commands.Bot(command_prefix="-")
+intents = discord.Intents.default()
+intents.message_content = True
+intents.voice_states = True
+bot = commands.Bot(command_prefix="-", intents=intents)
 logger = logging.getLogger(__name__)
 song_queue=[]
 
@@ -34,8 +37,15 @@ async def wait_queue(ctx):
         global song_queue
         if len(song_queue) > 0: 
             if not voice.is_playing(): 
-                song = pafy.new(song_queue[0]['url'], basic=False)
-                await asyncio.sleep(1)
+                while True: 
+                    try: 
+                        song = pafy.new(song_queue[0]['url'], basic=False)
+                        await asyncio.sleep(1)
+                    except KeyError as e: 
+                        logger.info(f"Pafy KeyError: {e}")
+                        del song_queue[0]
+                    finally: 
+                        break
                 audio = song.getbestaudio()
                 source = discord.FFmpegPCMAudio(audio.url, **FFMPEG_OPTIONS)
                 logger.info(f"Now Playing {song_queue[0]['title']}")
@@ -155,6 +165,17 @@ async def view_queue(ctx):
     else: 
         await ctx.send("No Songs in Queue")
 
+
+@bot.command(name="shuffle", aliases=['s'], help="Shuffle like this: -s")
+async def shuffle_queue(ctx):
+    global song_queue
+    if len(song_queue) > 0: 
+        random.shuffle(song_queue)
+        await ctx.send("Queue Shuffled")
+    else: 
+        await ctx.send("No Songs in Queue")
+
+
 @bot.command(name="play", aliases=['p'], help="Play song like this: !p")
 async def play_song(ctx, *args):
     global song_queue
@@ -162,64 +183,74 @@ async def play_song(ctx, *args):
         await ctx.send("No Voice Channel", "You need to be in a voice channel to use this command")
         return
         
-    author_connected = ctx.author.voice
+    author_connected = ctx.message.author.voice
     voice = discord.utils.get(bot.voice_clients, guild=ctx.guild)
     if author_connected:
 
         if (voice is None) or (voice.channel is not author_connected.channel):
-
+            logger.info(f"We are connected to: {author_connected.channel}")
             voice = await author_connected.channel.connect()
             logger.info(f"We have succesfully joined: {author_connected.channel}")
+        # voice = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+        # if voice and voice.is_connected():
+        #     logger.info("Switching voice channels")
+        #     await voice.move_to(ctx.author.voice.channel)
+        # else: 
+        #     logger.info("We weren't connected to anything")
+        #     voice = await author_connected.connect()
         if len(args) > 0: 
             search = concat_args(args)
             search = urllib.parse.quote(search)
-
-            html = urllib.request.urlopen(
-                f"https://www.youtube.com/results?search_query={search}"
-            )
+            try:
+                html = urllib.request.urlopen(
+                    f"https://www.youtube.com/results?search_query={search}"
+                )
+            except Exception as e: 
+                logger.info(f"Error {e}")
             video_ids = re.findall(r"watch\?v=(\S{11})", html.read().decode())
             if len(video_ids) == 0: 
                 await ctx.send("No results found...")
                 return
-            song_url = f"https://www.youtube.com/watch?v={video_ids[0]}"
+            song_url = f"https://www.youtube.com/watch?v={video_ids[1]}"
             logger.info(f"Song Url: {song_url}")
-            # params = {"format": "json", "url": song_url}
-            # url = "https://www.youtube.com/oembed"
-            # query_string = urllib.parse.urlencode(params)
-            # url = url + "?" + query_string
-            # with urllib.request.urlopen(url) as response:
-            #     response_text = response.read()
-            #     data = json.loads(response_text.decode())
-            #     logger.info(f"Data: {data}")
-            #     song_title = data['title'] 
             try: 
                 song = pafy.new(song_url, basic=False)
                 await asyncio.sleep(1)
             except KeyError as e: 
                 logger.info(f"Pafy KeyError: {e}")
                 return
+            except Exception as e: 
+                logger.info(f"Exception {e}")
+                return
             song_queue.append({"title": song.title, "url": song_url, "duration": song.duration})
-            if not voice.is_playing(): 
+            if not voice.is_playing() and len(song_queue) == 0: 
                 logger.info(f"Now Playing {song.title}")
                 try: 
                     audio = song.getbestaudio()
-                except KeyError as e: 
-                    logger.info(f"Pafy KeyError: {e}")
+                # except KeyError as e: 
+                #     logger.info(f"Pafy KeyError: {e}")
+                #     return
+                except Exception as e: 
+                    logger.info(f"Exception from audio{e}")
                     return
-                source = discord.FFmpegPCMAudio(audio.url, **FFMPEG_OPTIONS)
-                await ctx.send(f"Now Playing {song.title}")
+                try: 
+                    source = discord.FFmpegPCMAudio(audio.url, **FFMPEG_OPTIONS)
+                except Exception as e: 
+                    logger.info(f"Exception from Source{e}")
+                    return
+                await ctx.send(f"Now Playing: {song.title}")
                 del song_queue[0]
                 voice.play(source)
                 return
             else: 
-                await ctx.send(f"Song Queued {song.title}")
+                await ctx.send(f"Song Queued: {song.title}")
                 if len(song_queue) == 1: 
                     asyncio.run_coroutine_threadsafe(wait_queue(ctx), bot.loop)
                 return
         return
 
 
-@bot.command(name="stop", aliases=['s'], help="Stop song like this: !s")
+@bot.command(name="stop", help="Stop song like this: !s")
 async def stop_playing(ctx, *args):
     voice_client = ctx.message.guild.voice_client
     if voice_client.is_playing(): 
@@ -233,7 +264,7 @@ async def next_song(ctx):
     global song_queue
     voice_client = discord.utils.get(ctx.bot.voice_clients, guild=ctx.guild)
     if voice_client.is_playing(): 
-        voice_client.stop()
+        voice_client.pause()
         if len(song_queue) >= 1: 
             asyncio.run_coroutine_threadsafe(wait_queue(ctx), bot.loop)
         return
