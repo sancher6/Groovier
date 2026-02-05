@@ -1,13 +1,17 @@
 import discord
 import yt_dlp
+import os
 
 from discord.ext import commands
+from dotenv import load_dotenv
 
 from groovier.models.music_player import MusicPlayer
 from groovier.models.song import Song
 from groovier.constants import *
 
 # Bot setup
+load_dotenv()
+DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 intents = discord.Intents.default()
 intents.message_content = True
 intents.voice_states = True
@@ -45,6 +49,12 @@ player = MusicPlayer(bot)
 async def on_ready():
     print(f'{bot.user} has connected to Discord!')
     player.save_queue_state()
+
+@bot.event
+async def on_error(event, *args, **kwargs):
+    for arg in args:
+        if isinstance(arg, Exception):
+            raise arg    
 
 
 @bot.command(name='join', help='Join the voice channel')
@@ -251,6 +261,11 @@ async def now_playing(ctx):
     
     await ctx.send(embed=embed)
 
+def main(): 
+    if DISCORD_TOKEN is None:
+        raise ValueError("DISCORD_BOT_TOKEN variable has not been set!")    
+    bot.run(DISCORD_TOKEN)
+
 
 if __name__ == '__main__':
-    bot.run(DISCORD_TOKEN)
+    main()
