@@ -1,7 +1,0 @@
-name: groovier-dev
-
-dependencies: 
-- python>=3.4
-- pip 
-- pip: 
-  - youtube_dl 

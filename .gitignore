@@ -1,27 +1,15 @@
-# Logs
-logs
-*.log
-
-# Compiled binary addons (http://nodejs.org/api/addons.html)
-build/Release
-
-# Dependency directories
-node_modules/
-
-# Typescript v1 declaration files
-typings/
-
-# Optional npm cache directory
-.npm
-
-# Optional eslint cache
-.eslintcache
-
-# Output of 'npm pack'
-*.tgz
-
-# config
-config.json
-application.yml
-
+# Byte-compiled / optimized / DLL files
 __pycache__/
+*.py[cod]
+
+# Distribution / packaging
+*.egg-info/
+
+# Ignore all .env files
+.env
+.env.*
+
+# Current Queue File
+current_queue.json
+
+CLOUDFLARE_SETUP.md

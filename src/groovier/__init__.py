@@ -1,0 +1,1 @@
+from groovier.version import __version__
