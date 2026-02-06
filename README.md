@@ -1,6 +1,6 @@
 # Discord Music Bot - Setup Guide
 
-A feature-rich Discord music bot with queue management, playlist saving, and a live web interface to view the current queue and playlists.
+A Discord music bot with queue management, playlist saving, and a live web interface to view the current queue and playlists.
 
 ## Features
 
@@ -28,58 +28,14 @@ A feature-rich Discord music bot with queue management, playlist saving, and a l
 
 ## Prerequisites
 
-1. **Python 3.8 or higher**
+1. **Python 3.11 or higher**
 2. **FFmpeg** - Required for audio playback
 3. **Discord Bot Token** - Create a bot at https://discord.com/developers/applications
 4. **Cloudflare Tunnel** (optional) - For external access to web interface
 
 ## Installation
 
-### 1. Install FFmpeg
-
-**Windows:**
-- Download from https://ffmpeg.org/download.html
-- Extract and add to PATH
-
-**macOS:**
-```bash
-brew install ffmpeg
-```
-
-**Linux (Ubuntu/Debian):**
-```bash
-sudo apt update
-sudo apt install ffmpeg
-```
-
-### 2. Install Python Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### 3. Set Up Discord Bot
-
-1. Go to https://discord.com/developers/applications
-2. Click "New Application" and give it a name
-3. Go to "Bot" section and click "Add Bot"
-4. Under "Privileged Gateway Intents", enable:
-   - Message Content Intent
-   - Server Members Intent
-   - Presence Intent
-5. Click "Reset Token" and copy your bot token
-6. Go to "OAuth2" → "URL Generator"
-7. Select scopes: `bot`, `applications.commands`
-8. Select bot permissions:
-   - Connect
-   - Speak
-   - Use Voice Activity
-   - Send Messages
-   - Embed Links
-   - Read Message History
-9. Copy the generated URL and open it in your browser to invite the bot to your server
-
-### 4. Configure the Bot
+### 1. Configure the Bot
 
 Edit `discord_music_bot.py` and replace the token:
 
@@ -141,58 +97,15 @@ This will open a browser window to authenticate with your Cloudflare account.
 
 ### 3. Create a Tunnel
 
+First run application
 ```bash
-cloudflared tunnel create discord-music-bot
+python web_app.py
 ```
 
-This creates a tunnel and outputs a tunnel ID. Save this ID.
-
-### 4. Configure the Tunnel
-
-Create a config file at `~/.cloudflared/config.yml`:
-
-```yaml
-tunnel: <YOUR_TUNNEL_ID>
-credentials-file: /Users/<your-user>/.cloudflared/<YOUR_TUNNEL_ID>.json
-
-ingress:
-  - hostname: music-bot.yourdomain.com
-    service: http://localhost:5000
-  - service: http_status:404
-```
-
-Replace:
-- `<YOUR_TUNNEL_ID>` with your tunnel ID
-- `<your-user>` with your username
-- `music-bot.yourdomain.com` with your desired subdomain
-
-### 5. Set Up DNS
-
+Then create tunnel
 ```bash
-cloudflared tunnel route dns <YOUR_TUNNEL_ID> music-bot.yourdomain.com
-```
-
-### 6. Run the Tunnel
-
-```bash
-cloudflared tunnel run discord-music-bot
-```
-
-Or run it in the background:
-
-```bash
-cloudflared tunnel run discord-music-bot &
-```
-
-### Quick Setup (No Custom Domain)
-
-If you don't have a domain, use the quick tunnel feature:
-
-```bash
-cloudflared tunnel --url http://localhost:5000
-```
-
-This will give you a temporary `.trycloudflare.com` URL that you can share.
+winget install --id Cloudflare.cloudflared
+``` 
 
 ## Usage Guide
 
@@ -243,86 +156,3 @@ discord-music-bot/
 ├── current_queue.json     # Current queue state (auto-generated)
 └── README.md              # This file
 ```
-
-## Troubleshooting
-
-### Bot doesn't play audio
-- Ensure FFmpeg is installed and in your PATH
-- Check that the bot has "Connect" and "Speak" permissions
-- Try rejoining the voice channel with `!leave` then `!join`
-
-### "429 Too Many Requests" errors
-- YouTube may be rate limiting. Wait a few minutes and try again
-- Consider using a VPN if the issue persists
-
-### Web interface shows old data
-- The interface auto-refreshes every 5 seconds
-- Click the refresh button (⟳) in the bottom right to force an update
-- Ensure both the bot and web app are running
-
-### Cloudflare Tunnel connection issues
-- Verify the tunnel is running: `cloudflared tunnel info <TUNNEL_ID>`
-- Check the config file path is correct
-- Ensure port 5000 is not blocked by firewall
-
-## Advanced Configuration
-
-### Change Web Interface Port
-
-Edit `web_app.py`:
-
-```python
-app.run(host='0.0.0.0', port=8080, debug=True)  # Change 5000 to 8080
-```
-
-Remember to update your Cloudflare Tunnel config accordingly.
-
-### Auto-start on System Boot
-
-**Linux (systemd):**
-
-Create `/etc/systemd/system/discord-music-bot.service`:
-
-```ini
-[Unit]
-Description=Discord Music Bot
-After=network.target
-
-[Service]
-Type=simple
-User=your-username
-WorkingDirectory=/path/to/bot
-Environment="DISCORD_TOKEN=your-token"
-ExecStart=/usr/bin/python3 discord_music_bot.py
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Enable and start:
-```bash
-sudo systemctl enable discord-music-bot
-sudo systemctl start discord-music-bot
-```
-
-Do the same for the web app and Cloudflare Tunnel.
-
-## Security Notes
-
-- Never commit your Discord token to version control
-- Use environment variables for sensitive data
-- The web interface is read-only (users can't control playback from the web)
-- Consider adding authentication to the web interface if exposing publicly
-
-## License
-
-This project is provided as-is for personal use.
-
-## Support
-
-For issues or questions:
-1. Check that all dependencies are installed
-2. Verify FFmpeg is working: `ffmpeg -version`
-3. Check bot permissions in Discord
-4. Review logs for error messages
