@@ -7,18 +7,13 @@ This guide will help you set up Cloudflare Tunnel to make your music bot's web i
 This is the fastest way to get started. The URL will be temporary and change each time you restart.
 
 1. **Install Cloudflare Tunnel**
-   ```bash
-   # macOS
-   brew install cloudflare/cloudflare/cloudflared
-   
    # Windows - Download from:
    # https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/
+   This will ask you to run 
+   ```bash
+   winget install --id Cloudflare.cloudflared
+   ``` 
    
-   # Linux
-   wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
-   sudo dpkg -i cloudflared-linux-amd64.deb
-   ```
-
 2. **Start the Web App**
    ```bash
    python web_app.py

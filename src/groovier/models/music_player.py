@@ -1,9 +1,15 @@
 import json
 import asyncio
+import yt_dlp
+import discord
 
 from pathlib import Path
 from collections import deque
+
 from groovier.constants import *
+from groovier.models.song import Song
+
+ytdl = yt_dlp.YoutubeDL(YTDL_FORMAT_OPTIONS)
 
 class MusicPlayer:
     def __init__(self, bot):
@@ -71,7 +77,7 @@ class MusicPlayer:
             self.is_paused = False
             
             try:
-                source = discord.FFmpegPCMAudio(self.current_song.url, **ffmpeg_options)
+                source = discord.FFmpegPCMAudio(self.current_song.url, **FFMPEG_OPTIONS)
                 self.voice_client.play(
                     source,
                     after=lambda e: asyncio.run_coroutine_threadsafe(

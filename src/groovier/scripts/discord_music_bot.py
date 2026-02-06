@@ -1,8 +1,13 @@
 import discord
-import yt_dlp
 import os
 
 from discord.ext import commands
+from discord.ext.commands.errors import (
+    MissingPermissions,
+    CommandNotFound,
+    ExpectedClosingQuoteError,
+)
+
 from dotenv import load_dotenv
 
 from groovier.models.music_player import MusicPlayer
@@ -17,37 +22,19 @@ intents.message_content = True
 intents.voice_states = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# YT-DLP options
-ytdl_format_options = {
-    'format': 'bestaudio/best',
-    'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
-    'restrictfilenames': True,
-    'noplaylist': True,
-    'nocheckcertificate': True,
-    'ignoreerrors': False,
-    'logtostderr': False,
-    'quiet': True,
-    'no_warnings': True,
-    'default_search': 'auto',
-    'source_address': '0.0.0.0',
-    'extract_flat': False,
-}
-
-ffmpeg_options = {
-    'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
-    'options': '-vn'
-}
-
-ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
-
 
 # Global player instance
 player = MusicPlayer(bot)
 
 
+#####################################################################################################################################
+# Events
+#####################################################################################################################################
+
 @bot.event
 async def on_ready():
     print(f'{bot.user} has connected to Discord!')
+    await bot.change_presence(activity=discord.Game(name="with your mind! Use -help"))
     player.save_queue_state()
 
 @bot.event
@@ -56,21 +43,27 @@ async def on_error(event, *args, **kwargs):
         if isinstance(arg, Exception):
             raise arg    
 
+@bot.event
+async def on_command_error(ctx, error):
+    if ctx.cog is not None:
+        # Errors coming from cogs
+        print(f"Received cog exception: {error}")
+        raise error.original
 
-@bot.command(name='join', help='Join the voice channel')
-async def join(ctx):
-    if not ctx.author.voice:
-        await ctx.send("You need to be in a voice channel to use this command!")
-        return
-    
-    channel = ctx.author.voice.channel
-    if player.voice_client and player.voice_client.is_connected():
-        await player.voice_client.move_to(channel)
+    if isinstance(error, MissingPermissions):
+        # Handle missing permissions
+        await ctx.channel.send("Permission denied.")
+    elif isinstance(error, CommandNotFound):
+        await ctx.channel.send("Command not found")
+    elif isinstance(error, ExpectedClosingQuoteError):
+        await ctx.channel.send("Command not found")
     else:
-        player.voice_client = await channel.connect()
-    
-    await ctx.send(f"Joined {channel.name}!")
+        await ctx.channel.send("Something went wrong...")
+        raise error.original        
 
+#####################################################################################################################################
+# Core Commands
+#####################################################################################################################################
 
 @bot.command(name='leave', help='Leave the voice channel')
 async def leave(ctx):
@@ -85,6 +78,24 @@ async def leave(ctx):
         await ctx.send("Disconnected from voice channel!")
     else:
         await ctx.send("I'm not in a voice channel!")
+
+@bot.command(name='join', help='Join the voice channel')
+async def join(ctx):
+    if not ctx.author.voice:
+        await ctx.send("You need to be in a voice channel to use this command!")
+        return
+    
+    channel = ctx.author.voice.channel
+    if player.voice_client and player.voice_client.is_connected():
+        await player.voice_client.move_to(channel)
+    else:
+        player.voice_client = await channel.connect()
+    
+    await ctx.send(f"Joined {channel.name}!")        
+
+#####################################################################################################################################
+# Basic Commands
+#####################################################################################################################################
 
 
 @bot.command(name='play', help='Play a song (URL or search query)')
@@ -180,6 +191,10 @@ async def clear_queue(ctx):
     player.save_queue_state()
     await ctx.send("🗑️ Queue cleared!")
 
+
+#####################################################################################################################################
+# Playlist Commands 
+#####################################################################################################################################
 
 @bot.command(name='playlist_save', help='Save current queue as a playlist')
 async def save_playlist(ctx, *, name):

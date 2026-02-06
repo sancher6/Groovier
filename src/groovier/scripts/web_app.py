@@ -26,7 +26,10 @@ def load_playlists():
 
 @app.route('/')
 def index():
-    return render_template('../../index.html')
+    # index_path = Path(__file__).resolve().parents[2] / 'index.html'
+    # if index_path.is_file():
+    #     return render_template(str(index_path))
+    return render_template('index.html')
 
 
 @app.route('/api/queue')
@@ -50,10 +53,13 @@ def get_playlists():
     ]
     return jsonify(playlist_list)
 
-
-if __name__ == '__main__':
+def main():
     # Create templates directory if it doesn't exist
     Path('templates').mkdir(exist_ok=True)
     
     # Run on all interfaces so Cloudflare Tunnel can access it
     app.run(host='0.0.0.0', port=5000, debug=True)
+
+
+if __name__ == '__main__':
+    main()
