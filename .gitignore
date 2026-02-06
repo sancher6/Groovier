@@ -11,3 +11,5 @@ __pycache__/
 
 # Current Queue File
 current_queue.json
+
+CLOUDFLARE_SETUP.md
