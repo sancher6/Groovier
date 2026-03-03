@@ -1,0 +1,26 @@
+services:
+  discord-bot:
+    build: .
+    container_name: groovier-bot
+    command: local
+    restart: unless-stopped
+
+    env_file:
+      - ./src/groovier/scripts/.env
+
+    volumes:
+      - ./playlists.json:/app/playlists.json:rw
+      - ./current_queue.json:/app/current_queue.json:rw
+
+  web:
+    build: .
+    container_name: groovier-web
+    command: web
+    restart: unless-stopped
+
+    ports:
+      - "5000:5000"
+
+    volumes:
+      - ./playlists.json:/app/playlists.json:rw
+      - ./current_queue.json:/app/current_queue.json:rw

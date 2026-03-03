@@ -1,0 +1,4 @@
+src/groovier/scripts/.env
+__pycache__
+*.pyc
+.git
